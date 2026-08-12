@@ -20,9 +20,9 @@ NAS、容器和状态屏所需组件，首次启动无需在线安装软件包�
 PPPoE 账号、域名、API Token、FRP 密钥或其他设备配置。
 
 LCD 默认轮播网络、系统和服务状态，其中服务页显示 OpenClash、DDNS-Go、FRPS
-与 Docker 容器汇总。自定义主题不写入公开固件：可在 p4 的 `/mnt/mmcblk2p4/lcd/`
-放置 `status.png`/`status.webp` 作为状态页背景，以及 `animation.gif`/`animation.webp`
-作为全屏动画；缺少外部素材时会自动使用内置的通用企鹅背景。
+与 Docker 容器汇总。固件内置遥像素主题与轮播动画；仍可在 p4 的
+`/mnt/mmcblk2p4/lcd/` 放置 `status.png`/`status.webp` 和
+`animation.gif`/`animation.webp` 覆盖内置素材。若内外主题均无法读取，才会使用通用企鹅紧急背景。
 
 ## 构建方式
 

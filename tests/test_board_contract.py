@@ -152,6 +152,13 @@ class BoardContractTests(unittest.TestCase):
         self.assertIn('FINE3399_LCD_THEME_DIR="$theme_dir"', init_script)
         self.assertIn('procd_add_reload_trigger "lcd_display"', init_script)
 
+        built_in_theme = REPOSITORY_ROOT / "files" / "usr" / "share" / "fine3399-lcd"
+        self.assertGreater((built_in_theme / "status.webp").stat().st_size, 0)
+        self.assertGreater((built_in_theme / "animation.gif").stat().st_size, 0)
+        self.assertIn('BUILTIN_THEME_DIR = Path("/usr/share/fine3399-lcd")', program)
+        self.assertIn("fitting_font", program)
+        self.assertIn("visible_label", program)
+
     def test_lcd_module_rebuilds_ophub_host_tools_for_the_ci_architecture(self):
         build_script = LCD_BUILD_PATH.read_text(encoding="utf-8")
 

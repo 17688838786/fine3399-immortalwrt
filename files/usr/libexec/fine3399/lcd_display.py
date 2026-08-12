@@ -18,6 +18,7 @@ HEIGHT = 80
 FONT_PATH = "/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf"
 FONT_BOLD_PATH = "/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf"
 THEME_DIR = Path(os.environ.get("FINE3399_LCD_THEME_DIR", "/mnt/mmcblk2p4/lcd"))
+BUILTIN_THEME_DIR = Path("/usr/share/fine3399-lcd")
 PAGE_SECONDS = max(float(os.environ.get("FINE3399_LCD_PAGE_SECONDS", "8")), 1.0)
 SERVICE_SECONDS = max(float(os.environ.get("FINE3399_LCD_SERVICE_SECONDS", "5")), 1.0)
 ANIMATION_SECONDS = max(float(os.environ.get("FINE3399_LCD_ANIMATION_SECONDS", "6")), 0.0)
@@ -212,14 +213,21 @@ def default_background() -> Image.Image:
     return image
 
 
+def theme_directories() -> tuple[Path, ...]:
+    if THEME_DIR == BUILTIN_THEME_DIR:
+        return (THEME_DIR,)
+    return THEME_DIR, BUILTIN_THEME_DIR
+
+
 def load_background() -> Image.Image:
-    for name in ("status.png", "status.webp", "background.png", "background.webp"):
-        path = THEME_DIR / name
-        try:
-            with Image.open(path) as source:
-                return source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-        except OSError:
-            pass
+    for directory in theme_directories():
+        for name in ("status.png", "status.webp", "background.png", "background.webp"):
+            path = directory / name
+            try:
+                with Image.open(path) as source:
+                    return source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            except OSError:
+                pass
     return default_background()
 
 
@@ -229,6 +237,28 @@ def draw_panel(image: Image.Image) -> ImageDraw.ImageDraw:
     return draw
 
 
+def draw_right(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int, int],
+) -> None:
+    draw.text((x, y), text, font=font, fill=fill, anchor="ra")
+
+
+def fitting_font(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    preferred: ImageFont.FreeTypeFont,
+    fallback: ImageFont.FreeTypeFont,
+    max_width: int,
+) -> ImageFont.FreeTypeFont:
+    bounds = draw.textbbox((0, 0), text, font=preferred)
+    return preferred if bounds[2] - bounds[0] <= max_width else fallback
+
+
 def render_network(background: Image.Image, online: bool, rx_rate: float, tx_rate: float, fonts: dict[str, ImageFont.FreeTypeFont]) -> Image.Image:
     image = background.copy()
     draw = draw_panel(image)
@@ -236,8 +266,10 @@ def render_network(background: Image.Image, online: bool, rx_rate: float, tx_rat
     color = COLORS["ok"] if online else COLORS["error"]
     draw.ellipse((11, 17, 17, 23), fill=color)
     draw.text((21, 14), state, font=fonts["bold"], fill=color)
-    draw.text((10, 32), f"↓ {speed(rx_rate)}", font=fonts["big"], fill=COLORS["down"])
-    draw.text((10, 50), f"↑ {speed(tx_rate)}", font=fonts["big"], fill=COLORS["up"])
+    down = f"↓ {speed(rx_rate)}"
+    up = f"↑ {speed(tx_rate)}"
+    draw.text((10, 32), down, font=fitting_font(draw, down, fonts["big"], fonts["bold"], 58), fill=COLORS["down"])
+    draw.text((10, 50), up, font=fitting_font(draw, up, fonts["big"], fonts["bold"], 58), fill=COLORS["up"])
     return image
 
 
@@ -253,9 +285,10 @@ def render_system(background: Image.Image, cpu: int, memory: int, storage: int, 
         (64, "SSD", storage, COLORS["disk"]),
     ):
         draw.text((10, y - 6), label, font=fonts["small"], fill=COLORS["text"])
-        draw.rectangle((31, y, 64, y + 4), fill=(80, 69, 126, 255))
-        draw.rectangle((31, y, 31 + round(33 * value / 100), y + 4), fill=color)
-        draw.text((49, y - 7), f"{value}%", font=fonts["small"], fill=COLORS["text"])
+        value = max(0, min(100, value))
+        draw.rectangle((31, y, 48, y + 4), fill=(80, 69, 126, 255))
+        draw.rectangle((31, y, 31 + round(17 * value / 100), y + 4), fill=color)
+        draw_right(draw, 68, y - 7, f"{value}%", fonts["tiny"], COLORS["text"])
     return image
 
 
@@ -278,35 +311,42 @@ def render_services(
     image = background.copy()
     draw = draw_panel(image)
     draw.text((10, 12), "SERVICES", font=fonts["bold"], fill=COLORS["text"])
-    for y, (label, state, suffix) in zip((31, 43, 55, 67), services):
+    for y, (label, state, suffix) in zip((29, 41, 53, 65), services):
         draw.ellipse((10, y - 1, 15, y + 4), fill=status_color(state))
-        draw.text((19, y - 4), label, font=fonts["small"], fill=COLORS["text"])
+        visible_label = label
         if suffix:
-            draw.text((52, y - 4), suffix, font=fonts["small"], fill=status_color(state), anchor="ra")
+            suffix_box = draw.textbbox((0, 0), suffix, font=fonts["tiny"])
+            label_width = 68 - (suffix_box[2] - suffix_box[0]) - 3 - 19
+            while visible_label and draw.textbbox((0, 0), visible_label, font=fonts["tiny"])[2] > label_width:
+                visible_label = visible_label[:-1]
+        draw.text((19, y - 4), visible_label, font=fonts["tiny"], fill=COLORS["text"])
+        if suffix:
+            draw_right(draw, 68, y - 4, suffix, fonts["tiny"], status_color(state))
     return image
 
 
 def load_animation() -> list[tuple[Image.Image, float]]:
-    for name in ("animation.gif", "animation.webp"):
-        path = THEME_DIR / name
-        try:
-            frames: list[tuple[Image.Image, float]] = []
-            with Image.open(path) as source:
-                for index, frame in enumerate(ImageSequence.Iterator(source)):
-                    if index >= 120:
-                        break
-                    duration = max(float(frame.info.get("duration", 100)) / 1000, 0.05)
-                    frames.append((frame.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), duration))
-            if frames:
-                return frames
-        except OSError:
-            pass
-    for name in ("splash.png", "splash.webp"):
-        try:
-            with Image.open(THEME_DIR / name) as source:
-                return [(source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), 0.25)]
-        except OSError:
-            pass
+    for directory in theme_directories():
+        for name in ("animation.gif", "animation.webp"):
+            path = directory / name
+            try:
+                frames: list[tuple[Image.Image, float]] = []
+                with Image.open(path) as source:
+                    for index, frame in enumerate(ImageSequence.Iterator(source)):
+                        if index >= 120:
+                            break
+                        duration = max(float(frame.info.get("duration", 100)) / 1000, 0.05)
+                        frames.append((frame.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), duration))
+                if frames:
+                    return frames
+            except OSError:
+                pass
+        for name in ("splash.png", "splash.webp"):
+            try:
+                with Image.open(directory / name) as source:
+                    return [(source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), 0.25)]
+            except OSError:
+                pass
     return []
 
 
@@ -322,6 +362,7 @@ def rgb565(image: Image.Image) -> bytes:
 
 def main() -> None:
     fonts = {
+        "tiny": ImageFont.truetype(FONT_PATH, 8),
         "small": ImageFont.truetype(FONT_PATH, 9),
         "bold": ImageFont.truetype(FONT_BOLD_PATH, 10),
         "big": ImageFont.truetype(FONT_BOLD_PATH, 14),
