@@ -42,6 +42,7 @@ class VerifyArtifactsTests(unittest.TestCase):
             "etc/modules.d/30-brcmfmac": b"brcmfmac feature_disable=0x282000\n",
             "usr/bin/fine3399-lcd": lcd,
             "usr/share/fine3399-lcd/status.rgb565": b"\0" * (160 * 80 * 2),
+            "usr/share/fine3399-lcd/startup.rgb565": b"F339LCD1" + b"\0" * 32,
             "usr/share/fine3399-lcd/animation.rgb565": b"F339LCD1" + b"\0" * 32,
             "lib/firmware/brcm/brcmfmac43362-sdio.txt": b"boardtype=0x0598\n",
             "lib/firmware/rtl_nic/rtl8153b-2.fw": b"rtl8153b firmware\n",

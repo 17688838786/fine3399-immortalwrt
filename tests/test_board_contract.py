@@ -147,12 +147,17 @@ class BoardContractTests(unittest.TestCase):
             self.assertIn(service, program)
         self.assertIn('"CLASH"', program)
         self.assertIn("docker_icon", program)
+        self.assertIn("startup.rgb565", program)
         self.assertIn("animation.rgb565", program)
         self.assertIn("status.rgb565", program)
         self.assertIn("option theme_dir '/mnt/mmcblk2p4/lcd'", config)
         self.assertIn('FINE3399_LCD_THEME_DIR="$theme_dir"', init_script)
-        self.assertIn("option startup_seconds '5'", config)
+        self.assertIn("option startup_seconds '6'", config)
+        self.assertIn("option transition_seconds '0.6'", config)
+        self.assertIn("option animation_every '3'", config)
         self.assertIn('FINE3399_LCD_STARTUP_SECONDS="$startup_seconds"', init_script)
+        self.assertIn('FINE3399_LCD_TRANSITION_SECONDS="$transition_seconds"', init_script)
+        self.assertIn('FINE3399_LCD_ANIMATION_EVERY="$animation_every"', init_script)
         self.assertIn('procd_add_reload_trigger "lcd_display"', init_script)
 
         built_in_theme = REPOSITORY_ROOT / "files" / "usr" / "share" / "fine3399-lcd"
@@ -160,8 +165,12 @@ class BoardContractTests(unittest.TestCase):
         animation = (built_in_theme / "animation.rgb565").read_bytes()
         self.assertEqual(animation[:8], b"F339LCD1")
         self.assertGreater(len(animation), 160 * 80 * 2)
+        startup = (built_in_theme / "startup.rgb565").read_bytes()
+        self.assertEqual(startup[:8], b"F339LCD1")
+        self.assertGreater(len(startup), 160 * 80 * 2)
         self.assertIn("load_animation_file", program)
-        self.assertIn("play_animation(framebuffer, &animation, startup_seconds)", program)
+        self.assertIn("play_animation(framebuffer, &startup, startup_seconds)", program)
+        self.assertIn("play_transition", program)
 
         packages = (
             REPOSITORY_ROOT / "configs" / "imagebuilder" / "packages.txt"

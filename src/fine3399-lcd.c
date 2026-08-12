@@ -247,15 +247,16 @@ static int load_animation_file(const char *path, struct animation *animation)
 	return 0;
 }
 
-static int load_animation(const char *theme, struct animation *animation)
+static int load_animation(const char *theme, const char *name, struct animation *animation)
 {
 	char path[512];
 	if (theme && *theme) {
-		snprintf(path, sizeof(path), "%s/animation.rgb565", theme);
+		snprintf(path, sizeof(path), "%s/%s", theme, name);
 		if (!load_animation_file(path, animation))
 			return 0;
 	}
-	return load_animation_file("/usr/share/fine3399-lcd/animation.rgb565", animation);
+	snprintf(path, sizeof(path), "/usr/share/fine3399-lcd/%s", name);
+	return load_animation_file(path, animation);
 }
 
 static void default_interface(char output[IFNAMSIZ])
@@ -478,27 +479,92 @@ static void play_animation(uint16_t *framebuffer, const struct animation *animat
 	}
 }
 
+static void release_animation(struct animation *animation)
+{
+	if (animation->mapping && animation->mapping != MAP_FAILED)
+		munmap(animation->mapping, animation->size);
+	memset(animation, 0, sizeof(*animation));
+}
+
+static void blend_frames(
+	uint16_t *output,
+	const uint16_t *from,
+	const uint16_t *to,
+	unsigned amount
+)
+{
+	unsigned index;
+	for (index = 0; index < PIXELS; index++) {
+		unsigned source = from[index], target = to[index];
+		unsigned source_r = (source >> 11) & 31, source_g = (source >> 5) & 63, source_b = source & 31;
+		unsigned target_r = (target >> 11) & 31, target_g = (target >> 5) & 63, target_b = target & 31;
+		unsigned red = (source_r * (255 - amount) + target_r * amount + 127) / 255;
+		unsigned green = (source_g * (255 - amount) + target_g * amount + 127) / 255;
+		unsigned blue = (source_b * (255 - amount) + target_b * amount + 127) / 255;
+		output[index] = (uint16_t)((red << 11) | (green << 5) | blue);
+	}
+}
+
+static void play_transition(
+	uint16_t *framebuffer,
+	uint16_t *scratch,
+	const uint16_t *current,
+	const uint16_t *next,
+	const struct animation *animation,
+	double fade_seconds
+)
+{
+	unsigned index, fade_frames;
+	if (!animation->frames)
+		return;
+	fade_frames = (unsigned)(fade_seconds * 1000 / animation->delay_ms + 0.5);
+	if (fade_frames < 1)
+		fade_frames = 1;
+	if (fade_frames * 2 > animation->count)
+		fade_frames = animation->count / 2;
+	for (index = 0; index < animation->count; index++) {
+		const uint16_t *frame = (const uint16_t *)(animation->frames + (size_t)index * FRAME_BYTES);
+		if (index < fade_frames) {
+			unsigned amount = ((index + 1) * 255) / fade_frames;
+			blend_frames(scratch, current, frame, amount);
+			memcpy(framebuffer, scratch, FRAME_BYTES);
+		} else if (index >= animation->count - fade_frames) {
+			unsigned amount = ((index - (animation->count - fade_frames) + 1) * 255) / fade_frames;
+			blend_frames(scratch, frame, next, amount);
+			memcpy(framebuffer, scratch, FRAME_BYTES);
+		} else {
+			memcpy(framebuffer, frame, FRAME_BYTES);
+		}
+		usleep(animation->delay_ms * 1000);
+	}
+}
+
 int main(void)
 {
 	const char *fb_path = getenv("FINE3399_LCD_FB");
 	const char *theme = getenv("FINE3399_LCD_THEME_DIR");
 	double page_seconds = env_number("FINE3399_LCD_PAGE_SECONDS", 8, 1);
 	double service_seconds = env_number("FINE3399_LCD_SERVICE_SECONDS", 5, 1);
-	double animation_seconds = env_number("FINE3399_LCD_ANIMATION_SECONDS", 6, 0);
-	double startup_seconds = env_number("FINE3399_LCD_STARTUP_SECONDS", 5, 0);
-	uint16_t *background = malloc(FRAME_BYTES), *canvas = malloc(FRAME_BYTES), *framebuffer;
-	struct animation animation = {0};
+	double startup_seconds = env_number("FINE3399_LCD_STARTUP_SECONDS", 6, 0);
+	double transition_seconds = env_number("FINE3399_LCD_TRANSITION_SECONDS", 0.6, 0);
+	unsigned animation_every = (unsigned)env_number("FINE3399_LCD_ANIMATION_EVERY", 3, 1);
+	uint16_t *background = malloc(FRAME_BYTES), *canvas = malloc(FRAME_BYTES);
+	uint16_t *next_canvas = malloc(FRAME_BYTES), *scratch = malloc(FRAME_BYTES), *framebuffer;
+	struct animation startup = {0}, animation = {0};
 	struct metrics metrics = {0};
 	uint64_t old_rx = 0, old_tx = 0, old_total = 0, old_idle = 0;
 	double previous = monotonic_seconds(), services_at = 0;
+	unsigned rounds = 0;
 	int fb, page = 0;
-	if (!fb_path || !background || !canvas || load_background(theme, background)) return 1;
-	load_animation(theme, &animation);
+	if (!fb_path || !background || !canvas || !next_canvas || !scratch || load_background(theme, background)) return 1;
+	load_animation(theme, "startup.rgb565", &startup);
+	load_animation(theme, "animation.rgb565", &animation);
 	fb = open(fb_path, O_RDWR | O_CLOEXEC);
 	if (fb < 0) return 1;
 	framebuffer = mmap(NULL, FRAME_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fb, 0);
 	if (framebuffer == MAP_FAILED) return 1;
-	play_animation(framebuffer, &animation, startup_seconds);
+	play_animation(framebuffer, &startup, startup_seconds);
+	release_animation(&startup);
 	default_interface(metrics.iface);
 	old_rx = counter(metrics.iface, "rx"); old_tx = counter(metrics.iface, "tx"); cpu_sample(&old_total, &old_idle);
 	for (;;) {
@@ -522,7 +588,11 @@ int main(void)
 		for (int tick = 0; tick < (int)(duration * 2); tick++) usleep(500000);
 		page++;
 		if (page == 3) {
-			play_animation(framebuffer, &animation, animation_seconds);
+			rounds++;
+			if (animation.frames && rounds % animation_every == 0) {
+				render_network(next_canvas, background, &metrics);
+				play_transition(framebuffer, scratch, canvas, next_canvas, &animation, transition_seconds);
+			}
 			page = 0;
 			previous = monotonic_seconds();
 			old_rx = counter(metrics.iface, "rx");

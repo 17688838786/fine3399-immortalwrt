@@ -104,6 +104,7 @@ def verify_rootfs(rootfs: Path) -> None:
         "etc/modules.d/30-brcmfmac",
         "usr/bin/fine3399-lcd",
         "usr/share/fine3399-lcd/status.rgb565",
+        "usr/share/fine3399-lcd/startup.rgb565",
         "usr/share/fine3399-lcd/animation.rgb565",
         "lib/firmware/brcm/brcmfmac43362-sdio.txt",
         "lib/firmware/rtl_nic/rtl8153b-2.fw",
