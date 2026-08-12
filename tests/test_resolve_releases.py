@@ -32,17 +32,32 @@ def fixture(path):
             "tag_name": "v0.47.156",
             "assets": [{"name": "luci-app-openclash-0.47.156.apk", "browser_download_url": "https://example/clash", "digest": "sha256:d"}],
         }
-    if path.endswith("nginx-ui/repo/releases/latest"):
-        return {
-            "tag_name": "v2.5.6",
-            "assets": [
-                {
-                    "name": "nginx-ui-linux-arm64-v8a.tar.gz",
-                    "browser_download_url": "https://example/nginx-ui",
-                    "digest": "sha256:j",
-                }
-            ],
-        }
+    if path.endswith("nginx-ui/repo/releases?per_page=20"):
+        return [
+            {
+                "tag_name": "v2.5.7",
+                "draft": False,
+                "prerelease": False,
+                "assets": [
+                    {
+                        "name": "nginx-ui-termux-arm64-v8a.tar.gz",
+                        "browser_download_url": "https://example/nginx-ui-termux",
+                    }
+                ],
+            },
+            {
+                "tag_name": "v2.5.6",
+                "draft": False,
+                "prerelease": False,
+                "assets": [
+                    {
+                        "name": "nginx-ui-linux-arm64-v8a.tar.gz",
+                        "browser_download_url": "https://example/nginx-ui",
+                        "digest": "sha256:j",
+                    }
+                ],
+            },
+        ]
     return {
         "tag_name": "kernel_stable",
         "assets": [
@@ -66,6 +81,7 @@ class ResolveReleaseTests(unittest.TestCase):
             "nginx-ui-linux-arm64-v8a.tar.gz",
             result["nginx_ui"]["assets"][0]["name"],
         )
+        self.assertEqual("v2.5.6", result["nginx_ui"]["tag"])
 
     @patch("tools.resolve_releases.github_json", side_effect=fixture)
     def test_uses_configured_kernel_version_by_default(self, _request):

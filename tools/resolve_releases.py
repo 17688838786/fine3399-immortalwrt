@@ -59,11 +59,29 @@ def select_assets(release: dict[str, Any], patterns: list[str]) -> list[dict[str
     return selected
 
 
+def latest_release_with_assets(repository: str, patterns: list[str]) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    releases = github_json(f"repos/{repository}/releases?per_page=20")
+    if not isinstance(releases, list):
+        raise ResolutionError(f"{repository} releases response is not a list")
+    for release in releases:
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        try:
+            return release, select_assets(release, patterns)
+        except ResolutionError:
+            continue
+    raise ResolutionError(
+        f"no stable {repository} release contains all required assets: {', '.join(patterns)}"
+    )
+
+
 def resolve(config: dict[str, Any], kernel_version: str | None = None) -> dict[str, Any]:
     rolling = config["rolling"]
     argon = github_json(f"repos/{rolling['argon_repository']}/releases/latest")
     openclash = github_json(f"repos/{rolling['openclash_repository']}/releases/latest")
-    nginx_ui = github_json(f"repos/{rolling['nginx_ui_repository']}/releases/latest")
+    nginx_ui, nginx_ui_assets = latest_release_with_assets(
+        rolling["nginx_ui_repository"], [r"nginx-ui-linux-arm64-v8a\.tar\.gz"]
+    )
     kernel = github_json(
         f"repos/{rolling['kernel_repository']}/releases/tags/{rolling['kernel_release_tag']}"
     )
@@ -101,9 +119,7 @@ def resolve(config: dict[str, Any], kernel_version: str | None = None) -> dict[s
         },
         "nginx_ui": {
             "tag": nginx_ui["tag_name"],
-            "assets": select_assets(
-                nginx_ui, [r"nginx-ui-linux-arm64-v8a\.tar\.gz"]
-            ),
+            "assets": nginx_ui_assets,
         },
         "kernel": {
             "release_tag": kernel["tag_name"],
