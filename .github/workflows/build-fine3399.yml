@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run repository tests
         run: make test
 
@@ -39,13 +39,13 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install image and DTB build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential gcc-14-aarch64-linux-gnu flex bison libssl-dev python3 rsync file curl zstd btrfs-progs u-boot-tools qemu-utils kmod pigz
       - name: Cache downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: dl
           key: fine3399-downloads-${{ hashFiles('configs/releases.json', 'configs/imagebuilder/packages.txt', 'versions.lock.json') }}
@@ -92,7 +92,7 @@ jobs:
           kernel=$(python3 -c 'import json; print(json.load(open("dist/kernel-bundle/manifest.json"))["kernel_release"])')
           echo "name=fine3399-immortalwrt-${release}-${kernel}" >> "$GITHUB_OUTPUT"
       - name: Upload verified artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: dist/release/
@@ -108,7 +108,7 @@ jobs:
       contents: write
     steps:
       - name: Download verified firmware
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.artifact_name }}
           path: release
