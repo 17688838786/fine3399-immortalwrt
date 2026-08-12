@@ -1,2 +1,6 @@
 config display 'main'
 	option enabled '1'
+	option theme_dir '/mnt/mmcblk2p4/lcd'
+	option page_seconds '8'
+	option service_seconds '5'
+	option animation_seconds '6'

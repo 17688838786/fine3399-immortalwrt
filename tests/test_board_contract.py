@@ -132,6 +132,26 @@ class BoardContractTests(unittest.TestCase):
         self.assertIn('os.environ.get("FINE3399_LCD_FB")', program)
         self.assertNotIn('Path("/dev/fb0")', program)
 
+    def test_lcd_rotates_concise_pages_and_loads_external_artwork(self):
+        init_script = LCD_INIT_PATH.read_text(encoding="utf-8")
+        program = LCD_PROGRAM_PATH.read_text(encoding="utf-8")
+        config = (
+            REPOSITORY_ROOT / "files" / "etc" / "config" / "lcd_display"
+        ).read_text(encoding="utf-8")
+
+        for page in ('"network"', '"system"', '"services"'):
+            self.assertIn(page, program)
+        for service in ('"openclash"', '"ddns-go"', '"frps"', '"dockerd"'):
+            self.assertIn(service, program)
+        self.assertIn('"CLASH"', program)
+        self.assertIn('"DOCKER"', program)
+        self.assertIn('"animation.gif"', program)
+        self.assertIn('"status.webp"', program)
+        self.assertNotIn("socket.gethostname", program)
+        self.assertIn("option theme_dir '/mnt/mmcblk2p4/lcd'", config)
+        self.assertIn('FINE3399_LCD_THEME_DIR="$theme_dir"', init_script)
+        self.assertIn('procd_add_reload_trigger "lcd_display"', init_script)
+
     def test_lcd_module_rebuilds_ophub_host_tools_for_the_ci_architecture(self):
         build_script = LCD_BUILD_PATH.read_text(encoding="utf-8")
 
