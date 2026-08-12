@@ -85,9 +85,9 @@ fi
 mkdir -p "$toolchain_tree"
 tar --zstd -xf "$toolchain_archive" --strip-components=1 -C "$toolchain_tree"
 touch "$toolchain_marker"
-toolchain=$(find "$toolchain_tree/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)
-cc=$(find "$toolchain/bin" -maxdepth 1 \( -type f -o -type l \) -name '*-gcc' | head -n 1)
+cc=$(find "$toolchain_tree" \( -type f -o -type l \) -path '*/bin/*-gcc' | head -n 1)
 [ -x "$cc" ] || { echo "ImageBuilder target compiler is unavailable." >&2; exit 2; }
+toolchain=$(dirname "$(dirname "$cc")")
 mkdir -p "$overlay/usr/bin"
 STAGING_DIR="$toolchain" "$cc" -std=c11 -Os -Wall -Wextra -Wformat=2 -fstack-protector-strong \
 	-Wl,-z,now -Wl,-z,relro -s \
