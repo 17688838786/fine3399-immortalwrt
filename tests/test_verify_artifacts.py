@@ -62,7 +62,6 @@ class VerifyArtifactsTests(unittest.TestCase):
             "etc/nginx-ui/app.ini": b"[server]\nPort = 9000\n",
             "etc/nginx/nginx.conf": b"events {}\nhttp {}\n",
             "lib/upgrade/keep.d/nginx-ui": b"/etc/nginx/\n",
-            "usr/share/luci/menu.d/zz-fine3399-docker.json": b"{}\n",
             "usr/share/luci/menu.d/fine3399-nginx-ui.json": b"{}\n",
             "www/luci-static/resources/view/fine3399/nginx-ui.js": b"return view.extend({});\n",
         }

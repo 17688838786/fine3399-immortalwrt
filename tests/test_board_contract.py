@@ -10,15 +10,6 @@ LCD_PROGRAM_PATH = (
     REPOSITORY_ROOT / "src" / "fine3399-lcd.c"
 )
 LCD_BUILD_PATH = REPOSITORY_ROOT / "scripts" / "build-fine3399-dtb.sh"
-DOCKER_MENU_PATH = (
-    REPOSITORY_ROOT
-    / "files"
-    / "usr"
-    / "share"
-    / "luci"
-    / "menu.d"
-    / "zz-fine3399-docker.json"
-)
 NGINX_UI_INIT_PATH = REPOSITORY_ROOT / "files" / "etc" / "init.d" / "nginx-ui"
 NGINX_UI_CONFIG_PATH = REPOSITORY_ROOT / "files" / "etc" / "nginx-ui" / "app.ini"
 NGINX_CONFIG_PATH = REPOSITORY_ROOT / "files" / "etc" / "nginx" / "nginx.conf"
@@ -127,6 +118,7 @@ class BoardContractTests(unittest.TestCase):
 
         self.assertIn("/sys/class/graphics/fb*/name", init_script)
         self.assertIn("*st7735*", init_script)
+        self.assertIn("fb_fine3399_st7*", init_script)
         self.assertIn("FINE3399_LCD_FB", init_script)
         self.assertIn("modprobe fb_fine3399_st7735s", init_script)
         self.assertIn('getenv("FINE3399_LCD_FB")', program)
@@ -192,22 +184,16 @@ class BoardContractTests(unittest.TestCase):
         self.assertIn('scripts/mod/$source.host.o', build_script)
         self.assertIn('scripts/mod/modpost" $modpost_objects', build_script)
 
-    def test_dockerman_menu_is_presented_as_docker(self):
-        menu = DOCKER_MENU_PATH.read_text(encoding="utf-8")
-
-        self.assertIn('"admin/docker"', menu)
-        self.assertIn('"title": "Docker"', menu)
-        self.assertIn('"type": "alias"', menu)
-        self.assertIn('"path": "admin/services/dockerman"', menu)
-        self.assertIn('"admin/services/dockerman"', menu)
-        self.assertIn('"title": ""', menu)
+    def test_dockerman_uses_its_upstream_menu(self):
         self.assertFalse(
             (
                 REPOSITORY_ROOT
                 / "files"
-                / "etc"
-                / "uci-defaults"
-                / "92-fine3399-docker-menu"
+                / "usr"
+                / "share"
+                / "luci"
+                / "menu.d"
+                / "zz-fine3399-docker.json"
             ).exists()
         )
 

@@ -97,7 +97,6 @@ def verify_rootfs(rootfs: Path) -> None:
         "etc/nginx-ui/app.ini",
         "etc/nginx/nginx.conf",
         "lib/upgrade/keep.d/nginx-ui",
-        "usr/share/luci/menu.d/zz-fine3399-docker.json",
         "usr/share/luci/menu.d/fine3399-nginx-ui.json",
         "www/luci-static/resources/view/fine3399/nginx-ui.js",
         "etc/modules.d/drm-rockchip",

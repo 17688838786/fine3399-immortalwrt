@@ -23,7 +23,7 @@ start_service() {
 	for name_file in /sys/class/graphics/fb*/name; do
 		[ -r "$name_file" ] || continue
 		case "$(cat "$name_file")" in
-			*st7735*) fb_device="/dev/$(basename "$(dirname "$name_file")")"; break ;;
+			*st7735*|fb_fine3399_st7*) fb_device="/dev/$(basename "$(dirname "$name_file")")"; break ;;
 		esac
 	done
 	[ -n "$fb_device" ] && [ -c "$fb_device" ] || {
