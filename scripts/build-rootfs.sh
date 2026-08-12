@@ -10,6 +10,8 @@ manifest=${1:-build/resolved-releases.json}
 
 imagebuilder_url=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["immortalwrt"]["imagebuilder_url"])' "$manifest")
 imagebuilder_sha256=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["immortalwrt"]["imagebuilder_sha256"])' "$manifest")
+toolchain_url=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["immortalwrt"]["toolchain_url"])' "$manifest")
+toolchain_sha256=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["immortalwrt"]["toolchain_sha256"])' "$manifest")
 archive="dl/${imagebuilder_url##*/}"
 mkdir -p dl build dist/staging
 if [ ! -s "$archive" ]; then
@@ -17,6 +19,13 @@ if [ ! -s "$archive" ]; then
 	mv "${archive}.part" "$archive"
 fi
 echo "$imagebuilder_sha256  $archive" | sha256sum -c -
+
+toolchain_archive="dl/${toolchain_url##*/}"
+if [ ! -s "$toolchain_archive" ]; then
+	curl -fL --retry 4 --retry-delay 3 -o "${toolchain_archive}.part" "$toolchain_url"
+	mv "${toolchain_archive}.part" "$toolchain_archive"
+fi
+echo "$toolchain_sha256  $toolchain_archive" | sha256sum -c -
 
 tree=build/imagebuilder
 if [ -e "$tree" ]; then
@@ -67,7 +76,16 @@ python3 tools/install_nginx_ui_release.py \
 	--manifest "$manifest" \
 	--downloads dl/releases \
 	--root "$overlay"
-toolchain=$(find "$tree/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)
+toolchain_tree=build/toolchain
+toolchain_marker=build/.fine3399-toolchain
+if [ -e "$toolchain_tree" ]; then
+	[ -f "$toolchain_marker" ] || { echo "Refusing to replace unmarked $toolchain_tree" >&2; exit 2; }
+	rm -rf "$toolchain_tree"
+fi
+mkdir -p "$toolchain_tree"
+tar --zstd -xf "$toolchain_archive" --strip-components=1 -C "$toolchain_tree"
+touch "$toolchain_marker"
+toolchain=$(find "$toolchain_tree/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)
 cc=$(find "$toolchain/bin" -maxdepth 1 \( -type f -o -type l \) -name '*-gcc' | head -n 1)
 [ -x "$cc" ] || { echo "ImageBuilder target compiler is unavailable." >&2; exit 2; }
 mkdir -p "$overlay/usr/bin"
