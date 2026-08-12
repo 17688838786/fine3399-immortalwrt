@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+
+# The onboard BCM43362 SDIO device may appear after kmodloader has already
+# walked /etc/modules.d on the ophub kernel.  Load the driver explicitly
+# before netifd starts so the configured radio is present after every boot.
+
+START=18
+STOP=89
+
+start() {
+	modprobe brcmfmac feature_disable=0x282000 2>/dev/null || return 1
+}
+
+stop() {
+	return 0
+}

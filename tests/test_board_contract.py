@@ -112,6 +112,23 @@ class BoardContractTests(unittest.TestCase):
         self.assertIn("country=CN", baseline)
         self.assertIn("disabled=1", baseline)
 
+        wifi_loader = (
+            REPOSITORY_ROOT / "files" / "etc" / "init.d" / "fine3399-wifi"
+        ).read_text(encoding="utf-8")
+        self.assertIn("START=18", wifi_loader)
+        self.assertIn("modprobe brcmfmac", wifi_loader)
+
+    def test_docker_has_replaceable_registry_mirror(self):
+        baseline = (
+            REPOSITORY_ROOT
+            / "files"
+            / "etc"
+            / "uci-defaults"
+            / "90-fine3399-baseline"
+        ).read_text(encoding="utf-8")
+        self.assertIn("dockerd.globals.registry_mirrors", baseline)
+        self.assertIn("https://docker.1panel.live", baseline)
+
     def test_lcd_service_selects_st7735_instead_of_hdmi_framebuffer(self):
         init_script = LCD_INIT_PATH.read_text(encoding="utf-8")
         program = LCD_PROGRAM_PATH.read_text(encoding="utf-8")

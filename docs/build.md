@@ -37,6 +37,8 @@ ImageBuilder 和 DTB 阶段拒绝 root；只有 ophub 挂载和封装磁盘镜�
 - 启用 LCD 状态服务；
 - 启用仅绑定 `br-lan` 的 Avahi；Samba 预置 Mac 兼容和 SMB1 旧设备兼容，但不创建共享；
 - 保持 OpenClash、FRPS、DDNS-Go、UPnP、Docker、adblock-fast 等待配置的服务关闭；
+- 为 Dockerd 预置当前网络已实测可用的 `docker.1panel.live` 加速项，可在
+  Dockerman 中随时替换或删除；
 - 启动 Nginx UI（9000）和没有默认监听端口的 Nginx，不抢占 LuCI 的 80/443。
 
 FRPS 直接使用 ImmortalWrt 软件仓库中的 `frps`、init 脚本和 LuCI 管理界面，不再使用
@@ -58,6 +60,8 @@ procd 服务运行。LuCI 顶级菜单可直接嵌入或打开管理界面。配
 首次启动后由 ophub 的 `openwrt-tf` 创建并挂载 p3、p4，其中 p4 标记为
 `SHARE_DATA`，Docker 数据目录通过 UCI 自动指向 p4。若要改用 NVMe，可在 LuCI
 Dockerman 中修改 `data_root`。整盘写入会覆盖目标磁盘已有分区，写盘前必须备份。
+镜像和容器配置等小体量运行数据可留在 p4；下载、媒体库和备份等大文件应放 NVMe，
+避免占满约 11 GiB 的共享分区。
 
 ## 调整预装软件
 

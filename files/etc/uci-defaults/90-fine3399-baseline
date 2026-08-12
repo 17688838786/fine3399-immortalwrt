@@ -33,10 +33,24 @@ for iface in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-iface
 done
 uci -q commit wireless
 
+# /etc/modules.d is not sufficient on every ophub boot: the SDIO device can
+# be enumerated after kmodloader's pass.  Keep an explicit early boot loader.
+if [ -x /etc/init.d/fine3399-wifi ]; then
+	/etc/init.d/fine3399-wifi enable || true
+fi
+
 # Services needing credentials or policy stay off until configured in LuCI.
 for service in openclash frps ddns-go adblock-fast sqm dockerd samba4 wsdd2 miniupnpd; do
 	[ -x "/etc/init.d/${service}" ] && "/etc/init.d/${service}" disable || true
 done
+
+# Docker Hub is frequently unreachable from the target network. Keep this as
+# an ordinary UCI entry so it remains replaceable from Dockerman.
+if uci -q show dockerd.globals >/dev/null 2>&1; then
+	uci -q delete dockerd.globals.registry_mirrors || true
+	uci -q add_list dockerd.globals.registry_mirrors='https://docker.1panel.live'
+	uci -q commit dockerd
+fi
 
 # Bonjour/mDNS discovery is restricted to br-lan by avahi-daemon.conf.
 if [ -x /etc/init.d/avahi-daemon ]; then
