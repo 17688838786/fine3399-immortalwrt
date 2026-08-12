@@ -1,0 +1,10 @@
+{
+	"admin/nginx-ui": {
+		"title": "Nginx UI",
+		"order": 47,
+		"action": {
+			"type": "view",
+			"path": "fine3399/nginx-ui"
+		}
+	}
+}

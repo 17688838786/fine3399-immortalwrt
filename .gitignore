@@ -1,0 +1,13 @@
+/work/
+/build/
+/dist/
+/dl/
+/secrets/
+__pycache__/
+*.py[cod]
+*.log
+*.img
+*.img.gz
+*.tar
+*.tar.gz
+

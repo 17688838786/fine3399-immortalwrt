@@ -1,0 +1,65 @@
+diff --git a/remake b/remake
+index 8164568..b8f6a7a 100755
+--- a/remake
++++ b/remake
+@@ -89,6 +89,8 @@ kernel_repo="https://github.com/ophub/kernel"
+ # Set the kernel tags (kernel_xxx) that can be overridden via the [ -u ] parameter
+ default_tags="stable"
+ kernel_usage=""
++# Repository-controlled builds may supply a checked prebuilt bundle locally.
++local_kernel_bundle="${FINE3399_KERNEL_BUNDLE:-}"
+ # Set the list of kernels used by default(Selectable version)
+ stable_kernel=("6.12.y" "6.18.y")
+ flippy_kernel=(${stable_kernel[@]})
+@@ -948,6 +950,32 @@ replace_kernel() {
+     process_msg "(3/6) Replacing kernel files."
+     cd "${current_path}"
+ 
++    if [[ -n "${local_kernel_bundle}" ]]; then
++        [[ "${PLATFORM}" == "rockchip" && "${board}" == "fine3399" ]] || error_msg "Local kernel bundle is restricted to Fine3399."
++        local_kernel_bundle="$(realpath "${local_kernel_bundle}")"
++        [[ -s "${local_kernel_bundle}/manifest.json" && -s "${local_kernel_bundle}/sha256sums" ]] || error_msg "Invalid local kernel bundle."
++        check_kernel "${local_kernel_bundle}"
++        kernel_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["kernel_release"])' "${local_kernel_bundle}/manifest.json")"
++        kernel_boot="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["archives"]["boot"])' "${local_kernel_bundle}/manifest.json")"
++        kernel_dtb="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["archives"]["dtb"])' "${local_kernel_bundle}/manifest.json")"
++        kernel_modules="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["archives"]["modules"])' "${local_kernel_bundle}/manifest.json")"
++        [[ "${kernel_boot}" != */* && "${kernel_dtb}" != */* && "${kernel_modules}" != */* ]] || error_msg "Unsafe archive name in local kernel bundle."
++        tar -mxzf "${local_kernel_bundle}/${kernel_boot}" -C "${tag_bootfs}"
++        ln -sf "uInitrd-${kernel_name}" "${tag_bootfs}/uInitrd"
++        ln -sf "vmlinuz-${kernel_name}" "${tag_bootfs}/Image"
++        mkdir -p "${tag_bootfs}/dtb/rockchip"
++        tar -mxzf "${local_kernel_bundle}/${kernel_dtb}" -C "${tag_bootfs}/dtb/rockchip"
++        ln -sf dtb "${tag_bootfs}/dtb-${kernel_name}"
++        rm -rf "${tag_rootfs}/lib/modules"
++        mkdir -p "${tag_rootfs}/lib/modules"
++        tar -mxzf "${local_kernel_bundle}/${kernel_modules}" -C "${tag_rootfs}/lib/modules"
++        [[ -s "${tag_bootfs}/Image" ]] || error_msg "Local bundle did not install /boot/Image."
++        [[ -s "${tag_bootfs}/dtb/rockchip/rk3399-fine3399.dtb" ]] || error_msg "Local bundle did not install the Fine3399 DTB."
++        [[ -d "${tag_rootfs}/lib/modules/${kernel_name}" ]] || error_msg "Local bundle module release mismatch."
++        echo -e "${INFO} Installed checked local kernel bundle [ ${kernel_name} ]."
++        return 0
++    fi
++
+     # Determine kernel filename based on version
+     kernel_boot="$(ls ${kernel_path}/${conf_kernel_tags}/${kernel}/boot-${kernel}*.tar.gz 2>/dev/null | head -n 1)"
+     kernel_name="${kernel_boot##*/}" && kernel_name="${kernel_name:5:-7}"
+@@ -1363,9 +1391,14 @@ find_openwrt
+ # Download the dependency files
+ download_depends
+ # Query the latest kernel version
+-[[ "${auto_kernel}" =~ ^(true|yes)$ ]] && query_kernel
+-# Download the kernel files
+-download_kernel
++if [[ -n "${local_kernel_bundle}" ]]; then
++    [[ "${make_board}" == "fine3399" ]] || error_msg "FINE3399_KERNEL_BUNDLE requires -b fine3399."
++    check_kernel "${local_kernel_bundle}"
++else
++    [[ "${auto_kernel}" =~ ^(true|yes)$ ]] && query_kernel
++    # Download the kernel files
++    download_kernel
++fi
+ 
+ # Show make settings
+ echo -e "${INFO} [ ${#make_openwrt[@]} ] target board(s) to build: [ $(echo ${make_openwrt[@]} | xargs) ]"
+warning: in the working copy of 'remake', LF will be replaced by CRLF the next time Git touches it

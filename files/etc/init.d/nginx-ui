@@ -1,0 +1,61 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/bin/nginx-ui
+DEFAULT_CONFIG=/etc/nginx-ui/app.ini
+
+load_config_path() {
+	config_load nginx-ui
+	config_get CONFIG main config_path "$DEFAULT_CONFIG"
+	case "$CONFIG" in
+		/*) ;;
+		*)
+			logger -t nginx-ui "config_path must be absolute; using $DEFAULT_CONFIG"
+			CONFIG="$DEFAULT_CONFIG"
+			;;
+	esac
+
+	DATA_DIR="${CONFIG%/*}"
+	case "$CONFIG" in
+		/mnt/*/*)
+			mount_name="${CONFIG#/mnt/}"
+			mount_root="/mnt/${mount_name%%/*}"
+			if ! grep -qs "[[:space:]]${mount_root}[[:space:]]" /proc/mounts; then
+				logger -t nginx-ui "configured storage is not mounted: $mount_root"
+				return 1
+			fi
+			;;
+	esac
+
+	mkdir -p "$DATA_DIR"
+	if [ "$CONFIG" != "$DEFAULT_CONFIG" ] && [ ! -s "$CONFIG" ]; then
+		if [ "$DATA_DIR" != "${DEFAULT_CONFIG%/*}" ]; then
+			cp -a "${DEFAULT_CONFIG%/*}/." "$DATA_DIR/"
+		fi
+		[ -s "$CONFIG" ] || cp "$DEFAULT_CONFIG" "$CONFIG"
+	fi
+}
+
+start_service() {
+	load_config_path || return 1
+	procd_open_instance
+	procd_set_param command "$PROG" --config "$CONFIG"
+	procd_set_param env HOME="$DATA_DIR"
+	procd_set_param file "$CONFIG"
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger "nginx-ui"
+}
+
+reload_service() {
+	stop
+	start
+}

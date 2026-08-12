@@ -1,0 +1,102 @@
+# Router base
+-dnsmasq
+firewall4
+nftables-json
+dnsmasq-full
+ip-full
+ppp
+ppp-mod-pppoe
+odhcpd-ipv6only
+
+# LuCI and Chinese UI
+luci
+luci-ssl
+luci-i18n-base-zh-cn
+luci-compat
+luci-i18n-adblock-fast-zh-cn
+luci-i18n-ddns-go-zh-cn
+luci-i18n-diskman-zh-cn
+luci-i18n-dockerman-zh-cn
+luci-i18n-firewall-zh-cn
+luci-i18n-frps-zh-cn
+luci-i18n-nlbwmon-zh-cn
+luci-i18n-package-manager-zh-cn
+luci-i18n-samba4-zh-cn
+luci-i18n-sqm-zh-cn
+luci-i18n-upnp-zh-cn
+
+# OpenClash runtime
+bash
+ca-bundle
+curl
+ruby
+ruby-yaml
+unzip
+kmod-tun
+kmod-inet-diag
+kmod-nft-tproxy
+kmod-nft-socket
+
+# Fine3399 Wi-Fi and USB Ethernet user-facing support
+-wpad-basic-mbedtls
+wpad-openssl
+kmod-brcmfmac
+cypress-firmware-43362-sdio
+kmod-usb-net-rtl8152
+r8152-firmware
+# Rockchip DRM comes from the checked ophub kernel bundle. The armsr
+# ImageBuilder cannot select kmod-drm-rockchip because it requires TARGET_rockchip.
+
+# Storage and administration
+block-mount
+btrfs-progs
+e2fsprogs
+fdisk
+lsblk
+parted
+smartmontools
+nvme-cli
+luci-app-diskman
+luci-app-upnp
+ddns-go
+luci-app-ddns-go
+frps
+luci-app-frps
+
+# Native Nginx reverse proxy managed by Nginx UI. The checked-in base
+# configuration has no listeners, so LuCI keeps ports 80 and 443.
+nginx-ssl
+nginx-mod-stream
+
+# NAS
+samba4-server
+luci-app-samba4
+wsdd2
+avahi-dbus-daemon
+avahi-utils
+openssh-sftp-server
+rsync
+
+# Containers
+docker
+dockerd
+docker-compose
+luci-app-dockerman
+
+# Optional services, preinstalled but disabled until configured
+adblock-fast
+luci-app-adblock-fast
+sqm-scripts
+luci-app-sqm
+nlbwmon
+luci-app-nlbwmon
+
+# LCD and diagnostics
+python3
+python3-pillow
+dejavu-fonts-ttf-DejaVuSans
+ethtool
+iperf3
+tcpdump
+htop
+nano

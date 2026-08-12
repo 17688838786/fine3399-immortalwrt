@@ -1,0 +1,125 @@
+name: Build Fine3399 firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: "Optional exact ophub 6.12.x version; empty uses the matched 6.12.94 kernel"
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fine3399-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run repository tests
+        run: make test
+
+  build:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install image and DTB build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-14-aarch64-linux-gnu flex bison libssl-dev python3 rsync file curl zstd btrfs-progs u-boot-tools qemu-utils kmod pigz
+      - name: Cache downloads
+        uses: actions/cache@v4
+        with:
+          path: dl
+          key: fine3399-downloads-${{ hashFiles('configs/releases.json', 'configs/imagebuilder/packages.txt', 'versions.lock.json') }}
+          restore-keys: |
+            fine3399-downloads-
+      - name: Resolve rolling releases
+        env:
+          REQUESTED_KERNEL: ${{ inputs.kernel_version }}
+        run: |
+          args=""
+          if [ -n "$REQUESTED_KERNEL" ]; then
+            args="--kernel-version $REQUESTED_KERNEL"
+          fi
+          python3 tools/resolve_releases.py --config configs/releases.json --output build/resolved-releases.json $args
+      - name: Download and verify release assets
+        run: python3 tools/fetch_artifacts.py --manifest build/resolved-releases.json --destination dl/releases
+      - name: Check out locked ophub packager
+        run: python3 tools/checkout_sources.py --lock versions.lock.json --destination build/sources
+      - name: Build preinstalled ImmortalWrt rootfs
+        run: ./scripts/build-rootfs.sh build/resolved-releases.json
+      - name: Build only the Fine3399 display-enabled DTB
+        run: ./scripts/build-fine3399-dtb.sh build/resolved-releases.json
+      - name: Compose checked ophub kernel bundle
+        run: |
+          kernel_asset=$(python3 -c 'import json; print(json.load(open("build/resolved-releases.json"))["kernel"]["asset"]["name"])')
+          python3 tools/import_ophub_kernel.py \
+            --kernel "dl/releases/$kernel_asset" \
+            --dtb build/dtb-contract/arch/arm64/boot/dts/rockchip/rk3399-fine3399.dtb \
+            --module build/fine3399-st7735s-module/fb_fine3399_st7735s.ko \
+            --resolved build/resolved-releases.json \
+            --output dist/kernel-bundle
+      - name: Package 2 GiB Fine3399 image
+        run: sudo --preserve-env=GITHUB_TOKEN ./scripts/package-fine3399.sh build/resolved-releases.json
+      - name: Verify firmware artifacts
+        run: |
+          python3 tools/verify_fast_artifacts.py \
+            --rootfs dist/staging/immortalwrt-armsr-armv8-rootfs.tar.gz \
+            --bundle dist/kernel-bundle \
+            --image dist/staging/fine3399.img.gz
+      - name: Read artifact identity
+        id: artifact
+        run: |
+          release=$(python3 -c 'import json; print(json.load(open("build/resolved-releases.json"))["immortalwrt"]["version"])')
+          kernel=$(python3 -c 'import json; print(json.load(open("dist/kernel-bundle/manifest.json"))["kernel_release"])')
+          echo "name=fine3399-immortalwrt-${release}-${kernel}" >> "$GITHUB_OUTPUT"
+      - name: Upload verified artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: dist/release/
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release
+      - name: Publish direct download assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" release/* \
+              --verify-tag --generate-notes --title "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY"
+          fi

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "sources": {
+    "ophub": {
+      "url": "https://github.com/ophub/amlogic-s9xxx-openwrt.git",
+      "commit": "75dd68045f59011667c356fcda5bff84940c1c2f"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "immortalwrt": {
+    "version": "25.12.1",
+    "target": "armsr/armv8",
+    "imagebuilder_url": "https://downloads.immortalwrt.org/releases/25.12.1/targets/armsr/armv8/immortalwrt-imagebuilder-25.12.1-armsr-armv8.Linux-x86_64.tar.zst",
+    "imagebuilder_sha256": "0d549382957e9bb12d22f9acd97789cc4cba039d6dab14ed423572c8ce2207a6"
+  },
+  "rolling": {
+    "argon_repository": "jerrykuku/luci-theme-argon",
+    "openclash_repository": "vernesong/OpenClash",
+    "nginx_ui_repository": "0xJacky/nginx-ui",
+    "kernel_repository": "ophub/kernel",
+    "kernel_release_tag": "kernel_stable",
+    "kernel_series": "6.12",
+    "kernel_version": "6.12.94"
+  }
+}

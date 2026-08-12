@@ -1,0 +1,26 @@
+diff --git a/remake b/remake
+--- a/remake
++++ b/remake
+@@ -746,11 +746,17 @@ confirm_version() {
+     # Find the kernel version that matches the custom version
+     build_kernel=()
+     latest_kernel=(${tags_list[${conf_kernel_tags}]})
+-    for ck in "${model_kernel[@]}"; do
+-        for lk in "${latest_kernel[@]}"; do
+-            [[ "${lk}" =~ ^${ck}$ ]] && build_kernel+=("${lk}")
+-        done
+-    done
++    if [[ -n "${local_kernel_bundle}" ]]; then
++        # The checked local bundle is authoritative and may intentionally use a
++        # series different from the board database's rolling default.
++        build_kernel=("${latest_kernel[@]}")
++    else
++        for ck in "${model_kernel[@]}"; do
++            for lk in "${latest_kernel[@]}"; do
++                [[ "${lk}" =~ ^${ck}$ ]] && build_kernel+=("${lk}")
++            done
++        done
++    fi
+     # Check the kernel version
+     [[ "${#build_kernel[@]}" -eq 0 ]] && error_msg "The kernel list is invalid for [ ${board} ]"
+ }

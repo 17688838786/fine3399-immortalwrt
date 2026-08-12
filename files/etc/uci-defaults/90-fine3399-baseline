@@ -1,0 +1,58 @@
+#!/bin/sh
+set -eu
+
+uci -q batch <<'EOF'
+set system.@system[0].hostname='Fine3399'
+set system.@system[0].zonename='Asia/Shanghai'
+set system.@system[0].timezone='CST-8'
+commit system
+EOF
+
+# The BCM43362 SDIO device is enumerated before the ImageBuilder rootfs
+# finishes loading its ophub module bundle. AutoProbe therefore misses the
+# original hotplug event, so load it explicitly before generating Wi-Fi UCI.
+modprobe brcmfmac 2>/dev/null || true
+wifi_wait=0
+while [ "$wifi_wait" -lt 10 ] && ! ls /sys/class/ieee80211/phy* >/dev/null 2>&1; do
+	sleep 1
+	wifi_wait=$((wifi_wait + 1))
+done
+
+if ls /sys/class/ieee80211/phy* >/dev/null 2>&1 && \
+	! uci -q show wireless | grep -q '=wifi-device'; then
+	wifi config
+fi
+
+for radio in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-device$/\1/p"); do
+	uci -q set "wireless.${radio}.country=CN"
+	# Keep the radio off until an encrypted SSID is configured in LuCI.
+	uci -q set "wireless.${radio}.disabled=1"
+done
+for iface in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-iface$/\1/p"); do
+	uci -q set "wireless.${iface}.disabled=1"
+done
+uci -q commit wireless
+
+# Services needing credentials or policy stay off until configured in LuCI.
+for service in openclash frps ddns-go adblock-fast sqm dockerd samba4 wsdd2 miniupnpd; do
+	[ -x "/etc/init.d/${service}" ] && "/etc/init.d/${service}" disable || true
+done
+
+# Bonjour/mDNS discovery is restricted to br-lan by avahi-daemon.conf.
+if [ -x /etc/init.d/avahi-daemon ]; then
+	/etc/init.d/avahi-daemon enable || true
+	/etc/init.d/avahi-daemon restart || true
+fi
+
+# Nginx starts without any listeners; Nginx UI owns the site configuration.
+# This preserves LuCI on uHTTPd ports 80/443 until a deliberate migration.
+if [ -x /etc/init.d/nginx ]; then
+	/etc/init.d/nginx enable || true
+	/etc/init.d/nginx restart || true
+fi
+if [ -x /etc/init.d/nginx-ui ]; then
+	/etc/init.d/nginx-ui enable || true
+	/etc/init.d/nginx-ui restart || true
+fi
+
+exit 0

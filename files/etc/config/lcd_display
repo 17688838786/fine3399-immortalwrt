@@ -1,0 +1,2 @@
+config display 'main'
+	option enabled '1'
