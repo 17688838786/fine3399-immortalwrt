@@ -92,9 +92,6 @@ nlbwmon
 luci-app-nlbwmon
 
 # LCD and diagnostics
-python3
-python3-pillow
-dejavu-fonts-ttf-DejaVuSans
 ethtool
 iperf3
 tcpdump

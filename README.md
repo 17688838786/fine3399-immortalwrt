@@ -19,13 +19,18 @@ NAS、容器和状态屏所需组件，首次启动无需在线安装软件包�
 未配置的 OpenClash、DDNS-Go、FRPS、UPnP、Docker 和 adblock-fast 默认不启动。仓库不保存
 PPPoE 账号、域名、API Token、FRP 密钥或其他设备配置。
 
-LCD 默认轮播网络、系统和服务状态，其中服务页显示 OpenClash、DDNS-Go、FRPS
-与 Docker 容器汇总（Docker 使用容器鲸鱼像素图标）。固件内置遥像素主题，动画预转换为
-RGB565 帧包并直接写入 framebuffer；仍可在 p4 的
-`/mnt/mmcblk2p4/lcd/` 放置 `status.png`/`status.webp` 和
-`animation.rgb565`/`animation.gif`/`animation.webp` 覆盖内置素材。若内外主题均无法读取，才会使用通用企鹅紧急背景。
-自定义动画可在构建主机上用
-`python3 tools/convert_lcd_animation.py animation.gif animation.rgb565` 预转换。
+LCD 由原生 C 守护进程驱动，启动时先播放 5 秒遥像素动画，然后轮播网络、系统和
+服务状态。服务页显示 OpenClash、DDNS-Go、FRPS 与 Docker 容器汇总，
+Docker 使用容器鲸鱼像素图标。背景和动画都在构建时预转换为 RGB565，运行时直接
+写入 framebuffer，固件不再预装 Python、Pillow 和 TrueType 字体。
+
+可在 p4 的 `/mnt/mmcblk2p4/lcd/` 放置 `status.rgb565` 和 `animation.rgb565`
+覆盖内置素材。在电脑或 Actions 上使用以下命令转换源图：
+
+```sh
+python3 tools/convert_lcd_animation.py status.webp status.rgb565 --raw-frame
+python3 tools/convert_lcd_animation.py animation.gif animation.rgb565
+```
 
 ## 构建方式
 

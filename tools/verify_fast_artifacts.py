@@ -48,7 +48,6 @@ EXPECTED_PACKAGES = {
     "avahi-dbus-daemon",
     "avahi-utils",
     "adblock-fast",
-    "python3-pillow",
     "nginx-ssl",
     "nginx-mod-stream",
 }
@@ -103,7 +102,9 @@ def verify_rootfs(rootfs: Path) -> None:
         "www/luci-static/resources/view/fine3399/nginx-ui.js",
         "etc/modules.d/drm-rockchip",
         "etc/modules.d/30-brcmfmac",
-        "usr/libexec/fine3399/lcd_display.py",
+        "usr/bin/fine3399-lcd",
+        "usr/share/fine3399-lcd/status.rgb565",
+        "usr/share/fine3399-lcd/animation.rgb565",
         "lib/firmware/brcm/brcmfmac43362-sdio.txt",
         "lib/firmware/rtl_nic/rtl8153b-2.fw",
         "usr/bin/frps",
@@ -117,6 +118,7 @@ def verify_rootfs(rootfs: Path) -> None:
             found_files.add(name)
             if name in {
                 "etc/fine3399-nginx-ui-release.json",
+                "usr/bin/fine3399-lcd",
                 "usr/bin/frps",
                 "usr/bin/nginx-ui",
             } and member.isfile():
@@ -137,6 +139,13 @@ def verify_rootfs(rootfs: Path) -> None:
     frps = selected_files["usr/bin/frps"]
     if not frps.startswith(b"\x7fELF"):
         raise VerificationError("rootfs FRPS package payload is not an ELF binary")
+    lcd = selected_files["usr/bin/fine3399-lcd"]
+    if (
+        lcd[:6] != b"\x7fELF\x02\x01"
+        or len(lcd) < 20
+        or int.from_bytes(lcd[18:20], "little") != 183
+    ):
+        raise VerificationError("rootfs LCD daemon is not AArch64 ELF64")
     nginx_ui = selected_files["usr/bin/nginx-ui"]
     if (
         nginx_ui[:6] != b"\x7fELF\x02\x01"

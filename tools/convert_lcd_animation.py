@@ -19,14 +19,20 @@ HEADER = struct.Struct("<8sHHHH")
 def rgb565(image: Image.Image) -> bytes:
     output = bytearray(WIDTH * HEIGHT * 2)
     offset = 0
-    for red, green, blue in image.convert("RGB").getdata():
+    rgb_image = image.convert("RGB")
+    pixels = (
+        rgb_image.get_flattened_data()
+        if hasattr(rgb_image, "get_flattened_data")
+        else rgb_image.getdata()
+    )
+    for red, green, blue in pixels:
         value = ((red & 0xF8) << 8) | ((green & 0xFC) << 3) | (blue >> 3)
         struct.pack_into("<H", output, offset, value)
         offset += 2
     return bytes(output)
 
 
-def convert(source_path: Path, output_path: Path, limit: int) -> tuple[int, int]:
+def convert(source_path: Path, output_path: Path, limit: int, raw_frame: bool = False) -> tuple[int, int]:
     frames: list[bytes] = []
     durations: list[int] = []
     with Image.open(source_path) as source:
@@ -40,9 +46,10 @@ def convert(source_path: Path, output_path: Path, limit: int) -> tuple[int, int]
         raise ValueError(f"No frames found in {source_path}")
     delay_ms = round(sum(durations) / len(durations))
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(
-        HEADER.pack(MAGIC, WIDTH, HEIGHT, len(frames), delay_ms) + b"".join(frames)
-    )
+    if raw_frame:
+        output_path.write_bytes(frames[0])
+        return 1, delay_ms
+    output_path.write_bytes(HEADER.pack(MAGIC, WIDTH, HEIGHT, len(frames), delay_ms) + b"".join(frames))
     return len(frames), delay_ms
 
 
@@ -51,10 +58,11 @@ def main() -> None:
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--limit", type=int, default=120)
+    parser.add_argument("--raw-frame", action="store_true", help="write only the first raw RGB565 frame")
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 65535:
         parser.error("--limit must be between 1 and 65535")
-    frame_count, delay_ms = convert(args.source, args.output, args.limit)
+    frame_count, delay_ms = convert(args.source, args.output, args.limit, args.raw_frame)
     print(f"wrote {frame_count} frames at {delay_ms} ms to {args.output}")
 
 

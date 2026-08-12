@@ -25,6 +25,10 @@ class VerifyArtifactsTests(unittest.TestCase):
     def make_rootfs(self, packages=EXPECTED_PACKAGES):
         rootfs = self.root / "rootfs.tar.gz"
         frps = b"\x7fELFfrps"
+        lcd = bytearray(64)
+        lcd[:6] = b"\x7fELF\x02\x01"
+        lcd[18:20] = (183).to_bytes(2, "little")
+        lcd = bytes(lcd)
         nginx_ui = bytearray(64)
         nginx_ui[:6] = b"\x7fELF\x02\x01"
         nginx_ui[18:20] = (183).to_bytes(2, "little")
@@ -36,7 +40,9 @@ class VerifyArtifactsTests(unittest.TestCase):
             "etc/init.d/lcd_display": b"#!/bin/sh\n",
             "etc/modules.d/drm-rockchip": b"rockchipdrm\n",
             "etc/modules.d/30-brcmfmac": b"brcmfmac feature_disable=0x282000\n",
-            "usr/libexec/fine3399/lcd_display.py": b"#!/usr/bin/python3\n",
+            "usr/bin/fine3399-lcd": lcd,
+            "usr/share/fine3399-lcd/status.rgb565": b"\0" * (160 * 80 * 2),
+            "usr/share/fine3399-lcd/animation.rgb565": b"F339LCD1" + b"\0" * 32,
             "lib/firmware/brcm/brcmfmac43362-sdio.txt": b"boardtype=0x0598\n",
             "lib/firmware/rtl_nic/rtl8153b-2.fw": b"rtl8153b firmware\n",
             "usr/bin/frps": frps,

@@ -7,7 +7,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DTS_PATH = REPOSITORY_ROOT / "kernel" / "dts" / "rk3399-fine3399.dts"
 LCD_INIT_PATH = REPOSITORY_ROOT / "files" / "etc" / "init.d" / "lcd_display"
 LCD_PROGRAM_PATH = (
-    REPOSITORY_ROOT / "files" / "usr" / "libexec" / "fine3399" / "lcd_display.py"
+    REPOSITORY_ROOT / "src" / "fine3399-lcd.c"
 )
 LCD_BUILD_PATH = REPOSITORY_ROOT / "scripts" / "build-fine3399-dtb.sh"
 DOCKER_MENU_PATH = (
@@ -129,8 +129,10 @@ class BoardContractTests(unittest.TestCase):
         self.assertIn("*st7735*", init_script)
         self.assertIn("FINE3399_LCD_FB", init_script)
         self.assertIn("modprobe fb_fine3399_st7735s", init_script)
-        self.assertIn('os.environ.get("FINE3399_LCD_FB")', program)
-        self.assertNotIn('Path("/dev/fb0")', program)
+        self.assertIn('getenv("FINE3399_LCD_FB")', program)
+        self.assertNotIn('open("/dev/fb0"', program)
+        self.assertIn("/usr/bin/fine3399-lcd", init_script)
+        self.assertNotIn("python", init_script)
 
     def test_lcd_rotates_concise_pages_and_loads_external_artwork(self):
         init_script = LCD_INIT_PATH.read_text(encoding="utf-8")
@@ -139,27 +141,40 @@ class BoardContractTests(unittest.TestCase):
             REPOSITORY_ROOT / "files" / "etc" / "config" / "lcd_display"
         ).read_text(encoding="utf-8")
 
-        for page in ('"network"', '"system"', '"services"'):
+        for page in ("render_network", "render_system", "render_services"):
             self.assertIn(page, program)
-        for service in ('"openclash"', '"ddns-go"', '"frps"', '"dockerd"'):
+        for service in ("openclash", "ddns-go", "frps", "dockerd"):
             self.assertIn(service, program)
         self.assertIn('"CLASH"', program)
-        self.assertIn("draw_docker_icon", program)
-        self.assertIn('"animation.gif"', program)
-        self.assertIn('"status.webp"', program)
-        self.assertNotIn("socket.gethostname", program)
+        self.assertIn("docker_icon", program)
+        self.assertIn("animation.rgb565", program)
+        self.assertIn("status.rgb565", program)
         self.assertIn("option theme_dir '/mnt/mmcblk2p4/lcd'", config)
         self.assertIn('FINE3399_LCD_THEME_DIR="$theme_dir"', init_script)
+        self.assertIn("option startup_seconds '5'", config)
+        self.assertIn('FINE3399_LCD_STARTUP_SECONDS="$startup_seconds"', init_script)
         self.assertIn('procd_add_reload_trigger "lcd_display"', init_script)
 
         built_in_theme = REPOSITORY_ROOT / "files" / "usr" / "share" / "fine3399-lcd"
-        self.assertGreater((built_in_theme / "status.webp").stat().st_size, 0)
+        self.assertEqual((built_in_theme / "status.rgb565").stat().st_size, 160 * 80 * 2)
         animation = (built_in_theme / "animation.rgb565").read_bytes()
         self.assertEqual(animation[:8], b"F339LCD1")
         self.assertGreater(len(animation), 160 * 80 * 2)
-        self.assertIn('BUILTIN_THEME_DIR = Path("/usr/share/fine3399-lcd")', program)
-        self.assertIn("fitting_font", program)
-        self.assertIn("load_rgb565_animation", program)
+        self.assertIn("load_animation_file", program)
+        self.assertIn("play_animation(framebuffer, &animation, startup_seconds)", program)
+
+        packages = (
+            REPOSITORY_ROOT / "configs" / "imagebuilder" / "packages.txt"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("python3", packages)
+        self.assertNotIn("pillow", packages.lower())
+        self.assertNotIn("dejavu-fonts", packages)
+
+        build_script = (REPOSITORY_ROOT / "scripts" / "build-rootfs.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("src/fine3399-lcd.c", build_script)
+        self.assertIn('overlay/usr/bin/fine3399-lcd', build_script)
 
     def test_lcd_module_rebuilds_ophub_host_tools_for_the_ci_architecture(self):
         build_script = LCD_BUILD_PATH.read_text(encoding="utf-8")

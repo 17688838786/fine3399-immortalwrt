@@ -67,6 +67,13 @@ python3 tools/install_nginx_ui_release.py \
 	--manifest "$manifest" \
 	--downloads dl/releases \
 	--root "$overlay"
+toolchain=$(find "$tree/staging_dir" -maxdepth 1 -type d -name 'toolchain-*' | head -n 1)
+cc=$(find "$toolchain/bin" -maxdepth 1 \( -type f -o -type l \) -name '*-gcc' | head -n 1)
+[ -x "$cc" ] || { echo "ImageBuilder target compiler is unavailable." >&2; exit 2; }
+mkdir -p "$overlay/usr/bin"
+STAGING_DIR="$toolchain" "$cc" -std=c11 -Os -Wall -Wextra -Wformat=2 -fstack-protector-strong \
+	-Wl,-z,now -Wl,-z,relro -s \
+	-o "$overlay/usr/bin/fine3399-lcd" src/fine3399-lcd.c
 touch "$overlay_marker"
 
 packages=$(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' configs/imagebuilder/packages.txt | tr '\n' ' ')
