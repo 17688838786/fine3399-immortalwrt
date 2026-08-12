@@ -144,7 +144,7 @@ class BoardContractTests(unittest.TestCase):
         for service in ('"openclash"', '"ddns-go"', '"frps"', '"dockerd"'):
             self.assertIn(service, program)
         self.assertIn('"CLASH"', program)
-        self.assertIn('"DOCKER"', program)
+        self.assertIn("draw_docker_icon", program)
         self.assertIn('"animation.gif"', program)
         self.assertIn('"status.webp"', program)
         self.assertNotIn("socket.gethostname", program)
@@ -154,10 +154,12 @@ class BoardContractTests(unittest.TestCase):
 
         built_in_theme = REPOSITORY_ROOT / "files" / "usr" / "share" / "fine3399-lcd"
         self.assertGreater((built_in_theme / "status.webp").stat().st_size, 0)
-        self.assertGreater((built_in_theme / "animation.gif").stat().st_size, 0)
+        animation = (built_in_theme / "animation.rgb565").read_bytes()
+        self.assertEqual(animation[:8], b"F339LCD1")
+        self.assertGreater(len(animation), 160 * 80 * 2)
         self.assertIn('BUILTIN_THEME_DIR = Path("/usr/share/fine3399-lcd")', program)
         self.assertIn("fitting_font", program)
-        self.assertIn("visible_label", program)
+        self.assertIn("load_rgb565_animation", program)
 
     def test_lcd_module_rebuilds_ophub_host_tools_for_the_ci_architecture(self):
         build_script = LCD_BUILD_PATH.read_text(encoding="utf-8")

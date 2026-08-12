@@ -23,6 +23,8 @@ PAGE_SECONDS = max(float(os.environ.get("FINE3399_LCD_PAGE_SECONDS", "8")), 1.0)
 SERVICE_SECONDS = max(float(os.environ.get("FINE3399_LCD_SERVICE_SECONDS", "5")), 1.0)
 ANIMATION_SECONDS = max(float(os.environ.get("FINE3399_LCD_ANIMATION_SECONDS", "6")), 0.0)
 SAMPLE_SECONDS = 1.0
+RGB565_MAGIC = b"F339LCD1"
+RGB565_HEADER = struct.Struct("<8sHHHH")
 
 PANEL = (5, 10, 72, 70)
 COLORS = {
@@ -299,8 +301,24 @@ def service_snapshot() -> list[tuple[str, str, str]]:
         ("FRPS", service_state("frps"), ""),
     ]
     docker_state, docker_text = docker_summary()
-    services.append(("DOCKER", docker_state, docker_text))
+    services.append(("", docker_state, docker_text))
     return services
+
+
+def draw_docker_icon(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    color: tuple[int, int, int, int],
+) -> None:
+    """Draw a tiny container-whale glyph that remains legible at 160x80."""
+    for column, row in ((0, 1), (1, 1), (2, 1), (1, 0)):
+        left = x + column * 4
+        top = y + row * 3
+        draw.rectangle((left, top, left + 2, top + 2), fill=color)
+    draw.rectangle((x - 1, y + 7, x + 12, y + 8), fill=color)
+    draw.polygon(((x + 12, y + 5), (x + 16, y + 6), (x + 13, y + 9)), fill=color)
+    draw.point((x + 15, y + 5), fill=COLORS["text"])
 
 
 def render_services(
@@ -313,30 +331,55 @@ def render_services(
     draw.text((10, 12), "SERVICES", font=fonts["bold"], fill=COLORS["text"])
     for y, (label, state, suffix) in zip((29, 41, 53, 65), services):
         draw.ellipse((10, y - 1, 15, y + 4), fill=status_color(state))
-        visible_label = label
-        if suffix:
-            suffix_box = draw.textbbox((0, 0), suffix, font=fonts["tiny"])
-            label_width = 68 - (suffix_box[2] - suffix_box[0]) - 3 - 19
-            while visible_label and draw.textbbox((0, 0), visible_label, font=fonts["tiny"])[2] > label_width:
-                visible_label = visible_label[:-1]
-        draw.text((19, y - 4), visible_label, font=fonts["tiny"], fill=COLORS["text"])
+        if label:
+            draw.text((19, y - 4), label, font=fonts["tiny"], fill=COLORS["text"])
+        else:
+            draw_docker_icon(draw, 20, y - 5, COLORS["down"])
         if suffix:
             draw_right(draw, 68, y - 4, suffix, fonts["tiny"], status_color(state))
     return image
 
 
-def load_animation() -> list[tuple[Image.Image, float]]:
+def load_rgb565_animation(path: Path) -> list[tuple[bytes, float]]:
+    try:
+        payload = path.read_bytes()
+    except OSError:
+        return []
+    if len(payload) < RGB565_HEADER.size:
+        return []
+    magic, width, height, frame_count, delay_ms = RGB565_HEADER.unpack_from(payload)
+    frame_size = width * height * 2
+    expected_size = RGB565_HEADER.size + frame_count * frame_size
+    if (
+        magic != RGB565_MAGIC
+        or (width, height) != (WIDTH, HEIGHT)
+        or not frame_count
+        or len(payload) != expected_size
+    ):
+        return []
+    delay = max(delay_ms / 1000, 0.05)
+    return [
+        (payload[offset : offset + frame_size], delay)
+        for offset in range(RGB565_HEADER.size, expected_size, frame_size)
+    ]
+
+
+def load_animation() -> list[tuple[bytes, float]]:
     for directory in theme_directories():
+        frames = load_rgb565_animation(directory / "animation.rgb565")
+        if frames:
+            return frames
         for name in ("animation.gif", "animation.webp"):
             path = directory / name
             try:
-                frames: list[tuple[Image.Image, float]] = []
+                frames = []
                 with Image.open(path) as source:
                     for index, frame in enumerate(ImageSequence.Iterator(source)):
                         if index >= 120:
                             break
                         duration = max(float(frame.info.get("duration", 100)) / 1000, 0.05)
-                        frames.append((frame.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), duration))
+                        image = frame.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                        frames.append((rgb565(image), duration))
                 if frames:
                     return frames
             except OSError:
@@ -344,7 +387,8 @@ def load_animation() -> list[tuple[Image.Image, float]]:
         for name in ("splash.png", "splash.webp"):
             try:
                 with Image.open(directory / name) as source:
-                    return [(source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS), 0.25)]
+                    image = source.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+                    return [(rgb565(image), 0.25)]
             except OSError:
                 pass
     return []
@@ -411,12 +455,12 @@ def main() -> None:
                     page_started = now
                     page_index = 0
                     continue
-                frame, frame_duration = animation[animation_index]
+                frame_bytes, frame_duration = animation[animation_index]
                 if now - animation_frame_started >= frame_duration:
                     animation_index = (animation_index + 1) % len(animation)
                     animation_frame_started = now
-                    frame = animation[animation_index][0]
-                canvas = frame
+                    frame_bytes = animation[animation_index][0]
+                output = frame_bytes
             else:
                 if now - page_started >= duration:
                     page_index += 1
@@ -426,12 +470,12 @@ def main() -> None:
                             animation_started = now
                             animation_frame_started = now
                             animation_index = 0
-                            canvas = animation[0][0]
+                            output = animation[0][0]
                         else:
                             page_index = 0
                         if animation_started is not None:
                             framebuffer.seek(0)
-                            framebuffer.write(rgb565(canvas))
+                            framebuffer.write(output)
                             framebuffer.flush()
                             time.sleep(0.05)
                             continue
@@ -446,9 +490,10 @@ def main() -> None:
                         services = service_snapshot()
                         services_checked = now
                     canvas = render_services(background, services, fonts)
+                output = rgb565(canvas)
 
             framebuffer.seek(0)
-            framebuffer.write(rgb565(canvas))
+            framebuffer.write(output)
             framebuffer.flush()
             time.sleep(0.1 if animation_started is not None else 0.5)
 
