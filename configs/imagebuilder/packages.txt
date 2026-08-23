@@ -40,7 +40,7 @@ wpad-openssl
 ## 高通 QCN765 ath11k‑pci全套
 kmod-ath11k
 kmod-ath11k-pci
-ath11k-firmware-wcn6750
+ath11k-firmware-qcn6122
 kmod-cfg80211
 kmod-mac80211
 iw iw-full
