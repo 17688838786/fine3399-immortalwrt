@@ -44,6 +44,9 @@ ath11k-firmware-wcn6750
 kmod-cfg80211
 kmod-mac80211
 iw iw-full
+##硬件调试工具
+pciutils
+usbutils
 ## USB RTL8152 有线网卡
 kmod-usb-net-rtl8152
 r8152-firmware
