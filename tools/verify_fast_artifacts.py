@@ -37,7 +37,6 @@ EXPECTED_PACKAGES = {
     "fdisk",
     "lsblk",
     "parted",
-    "cypress-firmware-43362-sdio",
     "r8152-firmware",
     "luci-app-diskman",
     "luci-app-upnp",
