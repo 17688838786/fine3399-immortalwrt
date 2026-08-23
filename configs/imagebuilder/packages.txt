@@ -7,7 +7,6 @@ ip-full
 ppp
 ppp-mod-pppoe
 odhcpd-ipv6only
-
 # LuCI and Chinese UI
 luci
 luci-ssl
@@ -24,7 +23,6 @@ luci-i18n-package-manager-zh-cn
 luci-i18n-samba4-zh-cn
 luci-i18n-sqm-zh-cn
 luci-i18n-upnp-zh-cn
-
 # OpenClash runtime
 bash
 ca-bundle
@@ -36,17 +34,21 @@ kmod-tun
 kmod-inet-diag
 kmod-nft-tproxy
 kmod-nft-socket
-
-# Fine3399 Wi-Fi and USB Ethernet user-facing support
+# Fine3399 PCI‑E QCN765 WIFI + USB RTL8152网卡
 -wpad-basic-mbedtls
 wpad-openssl
-kmod-brcmfmac
-cypress-firmware-43362-sdio
+## 高通 QCN765 ath11k‑pci全套
+kmod-ath11k
+kmod-ath11k-pci
+ath11k-firmware-wcn6750
+kmod-cfg80211
+kmod-mac80211
+iw iw-full
+## USB RTL8152 有线网卡
 kmod-usb-net-rtl8152
 r8152-firmware
 # Rockchip DRM comes from the checked ophub kernel bundle. The armsr
 # ImageBuilder cannot select kmod-drm-rockchip because it requires TARGET_rockchip.
-
 # Storage and administration
 block-mount
 btrfs-progs
@@ -62,12 +64,10 @@ ddns-go
 luci-app-ddns-go
 frps
 luci-app-frps
-
 # Native Nginx reverse proxy managed by Nginx UI. The checked-in base
 # configuration has no listeners, so LuCI keeps ports 80 and 443.
 nginx-ssl
 nginx-mod-stream
-
 # NAS
 samba4-server
 luci-app-samba4
@@ -76,13 +76,11 @@ avahi-dbus-daemon
 avahi-utils
 openssh-sftp-server
 rsync
-
 # Containers
 docker
 dockerd
 docker-compose
 luci-app-dockerman
-
 # Optional services, preinstalled but disabled until configured
 adblock-fast
 luci-app-adblock-fast
@@ -90,10 +88,13 @@ sqm-scripts
 luci-app-sqm
 nlbwmon
 luci-app-nlbwmon
-
-# LCD and diagnostics
+# 系统调试工具
 ethtool
 iperf3
 tcpdump
 htop
 nano
+## Argon美化皮肤（深色主题、自定义壁纸）
+luci-theme-argon
+luci-app-argon-config
+luci-i18n-argon-config-zh-cn
