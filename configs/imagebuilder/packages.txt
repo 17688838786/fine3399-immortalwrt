@@ -35,15 +35,16 @@ kmod-inet-diag
 kmod-nft-tproxy
 kmod-nft-socket
 # Fine3399 PCI‑E QCN765 WIFI + USB RTL8152网卡
--wpad-basic-mbedtls
-wpad-openssl
+‑wpad‑basic‑mbedtls
+wpad‑openssl
 ## 高通 QCN765 ath11k‑pci全套
-kmod-ath11k
-kmod-ath11k-pci
-CONFIG_PACKAGE_ath11k-firmware-wcn6855
-kmod-cfg80211
-kmod-mac80211
-iw iw-full
+kmod‑ath11k
+kmod‑ath11k‑pci
+ath11k‑firmware‑wcn6855
+ath11k‑firmware‑board2
+kmod‑cfg80211
+kmod‑mac80211
+iw iw‑full
 ##硬件调试工具
 pciutils
 usbutils
